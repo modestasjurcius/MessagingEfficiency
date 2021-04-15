@@ -9,6 +9,8 @@ namespace RabbitConsumerMicroservice.Services
 {
     public class RabbitConsumerService : IRabbitConsumerService
     {
+        private IConnection _connection;
+        private IModel _channel;
         public RabbitConsumerService()
         {
             ConfigureConsumer();
@@ -16,7 +18,32 @@ namespace RabbitConsumerMicroservice.Services
         
         public ServiceResponse Get()
         {
-            return new ServiceResponse() { Success = true, Message = "Alive" };
+            return new ServiceResponse() { Success = true, Message = "Rabbit consumer is alive" };
+        }
+
+        public ServiceResponse Consume()
+        {
+            try
+            {
+                var consumer = new EventingBasicConsumer(_channel);
+                consumer.Received += (model, ea) =>
+                {
+                    var body = ea.Body.ToArray();
+                    var message = Encoding.UTF8.GetString(body);
+                };
+
+                _channel.BasicConsume(
+                        queue: ConfigurationManager.AppSettings["Queue"],
+                        autoAck: true,
+                        consumer: consumer
+                    );
+
+                return new ServiceResponse() { Success = true, Message = "Rabbit consumer started working" };
+            }
+            catch (Exception ex)
+            {
+                return new ServiceResponse() { Success = false, Message = ex.Message };
+            }
         }
 
         private void ConfigureConsumer()
@@ -25,34 +52,21 @@ namespace RabbitConsumerMicroservice.Services
             {
                 // hostname = 'localhost' for local debug, 'host.docker.internal' for docker
                 var factory = new ConnectionFactory() { HostName = ConfigurationManager.AppSettings["RabbitHostName"] };
+                //var factory = new ConnectionFactory() { HostName = "localhost" };
                 factory.UserName = ConfigurationManager.AppSettings["RabbitUsername"];
                 factory.Password = ConfigurationManager.AppSettings["RabbitPassword"];
                 factory.Port = int.Parse(ConfigurationManager.AppSettings["RabbitPort"]);
 
-                using (var connection = factory.CreateConnection())
-                using (var channel = connection.CreateModel())
-                {
-                    channel.QueueDeclare(
+                _connection = factory.CreateConnection();
+                _channel = _connection.CreateModel();
+
+                _channel.QueueDeclare(
                             queue: ConfigurationManager.AppSettings["Queue"],
                             durable: false,
                             exclusive: false,
                             autoDelete: false,
                             arguments: null
                         );
-
-                    var consumer = new EventingBasicConsumer(channel);
-                    consumer.Received += (model, ea) =>
-                    {
-                        var body = ea.Body.ToArray();
-                        var message = Encoding.UTF8.GetString(body);
-                    };
-
-                    channel.BasicConsume(
-                            queue: ConfigurationManager.AppSettings["Queue"],
-                            autoAck: true,
-                            consumer: consumer
-                        );
-                }
             }
             catch(Exception ex)
             {

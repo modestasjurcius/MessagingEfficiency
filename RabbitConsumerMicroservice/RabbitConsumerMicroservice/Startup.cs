@@ -34,7 +34,10 @@ namespace RabbitConsumerMicroservice
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "RabbitConsumerMicroservice", Version = "v1" });
             });
 
-            services.AddSingleton<IRabbitConsumerService, RabbitConsumerService>();
+            services.AddSingleton<IRabbitConsumerService, RabbitConsumerService>(op =>
+            {
+                return new RabbitConsumerService();
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

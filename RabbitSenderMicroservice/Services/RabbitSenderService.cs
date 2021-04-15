@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
+﻿using RabbitMQ.Client;
 using RabbitSenderMicroservice.Entities;
 using System;
 using System.Configuration;
@@ -9,30 +8,23 @@ namespace RabbitSenderMicroservice.Services
 {
     public class RabbitSenderService : IRabbitSenderService
     {
-        private readonly ILogger<RabbitSenderService> _logger;
+        private IConnection _connection;
 
-        public RabbitSenderService(ILogger<RabbitSenderService> logger)
+        public RabbitSenderService()
         {
-            _logger = logger;
+            Configure();
         }
 
         public ServiceResponse Get()
         {
-            return new ServiceResponse() { Success = true, Message = "Alive" };
+            return new ServiceResponse() { Success = true, Message = "Rabbit sender is alive" };
         }
 
         public ServiceResponse SendMessages(SendMessagesArgs args)
         {
             try
             {
-                // hostname = 'localhost' for local debug, 'host.docker.internal' for docker
-                var factory = new ConnectionFactory() { HostName = ConfigurationManager.AppSettings["RabbitHostName"] };
-                factory.UserName = ConfigurationManager.AppSettings["RabbitUsername"];
-                factory.Password = ConfigurationManager.AppSettings["RabbitPassword"];
-                factory.Port = int.Parse(ConfigurationManager.AppSettings["RabbitPort"]);
-
-                using (var connection = factory.CreateConnection())
-                using (var channel = connection.CreateModel())
+                using (var channel = _connection.CreateModel())
                 {
                     channel.QueueDeclare(
                             queue: args.Queue,
@@ -42,7 +34,9 @@ namespace RabbitSenderMicroservice.Services
                             arguments: null
                         );
 
-                    string message = "Hello from RabbitSenderService!";
+                    string guid = Guid.NewGuid().ToString();
+
+                    string message = "Hello from RabbitSenderService! guid = " + guid;
                     var body = Encoding.UTF8.GetBytes(message);
 
                     for (int i = 0; i < args.MessageCount; i++)
@@ -62,6 +56,17 @@ namespace RabbitSenderMicroservice.Services
             {
                 return new ServiceResponse() { Success = false, Message = ex.Message };
             }
+        }
+
+        private void Configure()
+        {
+            // hostname = 'localhost' for local debug, 'host.docker.internal' for docker
+            var factory = new ConnectionFactory() { HostName = ConfigurationManager.AppSettings["RabbitHostName"] };
+            factory.UserName = ConfigurationManager.AppSettings["RabbitUsername"];
+            factory.Password = ConfigurationManager.AppSettings["RabbitPassword"];
+            factory.Port = int.Parse(ConfigurationManager.AppSettings["RabbitPort"]);
+
+            _connection = factory.CreateConnection();
         }
     }
 }

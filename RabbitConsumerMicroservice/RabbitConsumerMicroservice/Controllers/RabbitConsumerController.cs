@@ -1,11 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using RabbitConsumerMicroservice.Entities;
 using RabbitConsumerMicroservice.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace RabbitConsumerMicroservice.Controllers
 {
@@ -21,6 +16,14 @@ namespace RabbitConsumerMicroservice.Controllers
         }
 
         [HttpGet]
+        [Route("[action]")]
+        public ServiceResponse Consume()
+        {
+            return _service.Consume();
+        }
+
+        [HttpGet]
+        [Route("[action]")]
         public ServiceResponse Get()
         {
             return _service.Get();
