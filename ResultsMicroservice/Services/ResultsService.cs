@@ -26,5 +26,19 @@ namespace ResultsMicroservice.Services
                 return new ServiceResponse() { Success = false, Message = ex.Message };
             }
         }
+
+        public ServiceResponse UpdateRabbitResult(RabbitTestLastReceived args)
+        {
+            try
+            {
+                _repository.UpdateLastReceived(args);
+
+                return new ServiceResponse() { Success = true, Message = "Updated" };
+            }
+            catch (Exception ex)
+            {
+                return new ServiceResponse() { Success = false, Message = ex.Message };
+            }
+        }
     }
 }

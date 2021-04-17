@@ -1,9 +1,11 @@
 ﻿using RabbitConsumerMicroservice.Entities;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RestSharp;
 using System;
 using System.Configuration;
 using System.Text;
+using System.Text.Json;
 
 namespace RabbitConsumerMicroservice.Services
 {
@@ -29,7 +31,14 @@ namespace RabbitConsumerMicroservice.Services
                 consumer.Received += (model, ea) =>
                 {
                     var body = ea.Body.ToArray();
-                    var message = Encoding.UTF8.GetString(body);
+                    if (body.Length == 0)
+                        return;
+
+                    var readOnlySpan = new ReadOnlySpan<byte>(body);
+                    var message = JsonSerializer.Deserialize<RabbitMessage>(readOnlySpan);
+
+                    if (message != null && !string.IsNullOrWhiteSpace(message.Guid))
+                        UpdateLastReceived(DateTimeOffset.Now.ToUnixTimeMilliseconds(), message.Guid);
                 };
 
                 _channel.BasicConsume(
@@ -46,13 +55,33 @@ namespace RabbitConsumerMicroservice.Services
             }
         }
 
+        private void UpdateLastReceived(long receivedAt, string guid)
+        {
+            try
+            {
+                var client = new RestClient(ConfigurationManager.AppSettings["ResultsUrl"]);
+                var request = new RestRequest("/Results/UpdateLastReceived", Method.POST);
+
+                var sendData = new RabbitLastMessageReceivedArgs()
+                {
+                    Guid = guid,
+                    LastReceivedAt = receivedAt
+                };
+
+                request.AddJsonBody(sendData);
+
+                var response = client.Execute<ServiceResponse>(request);
+            }
+            catch (Exception)
+            {
+            }
+        }
+
         private void ConfigureConsumer()
         {
             try
             {
-                // hostname = 'localhost' for local debug, 'host.docker.internal' for docker
                 var factory = new ConnectionFactory() { HostName = ConfigurationManager.AppSettings["RabbitHostName"] };
-                //var factory = new ConnectionFactory() { HostName = "localhost" };
                 factory.UserName = ConfigurationManager.AppSettings["RabbitUsername"];
                 factory.Password = ConfigurationManager.AppSettings["RabbitPassword"];
                 factory.Port = int.Parse(ConfigurationManager.AppSettings["RabbitPort"]);
@@ -68,9 +97,8 @@ namespace RabbitConsumerMicroservice.Services
                             arguments: null
                         );
             }
-            catch(Exception ex)
+            catch(Exception)
             {
-                //report exception to results service
             }
         }
     }

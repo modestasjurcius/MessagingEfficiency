@@ -31,5 +31,12 @@ namespace ResultsMicroservice.Controllers
         {
             return _service.InsertRabbitResult(result);
         }
+
+        [HttpPost]
+        [Route("[action]")]
+        public ServiceResponse UpdateLastReceived(RabbitTestLastReceived args)
+        {
+            return _service.UpdateRabbitResult(args);
+        }
     }
 }

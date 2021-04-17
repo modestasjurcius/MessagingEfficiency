@@ -4,6 +4,7 @@ using RestSharp;
 using System;
 using System.Configuration;
 using System.Text;
+using System.Text.Json;
 
 namespace RabbitSenderMicroservice.Services
 {
@@ -18,7 +19,6 @@ namespace RabbitSenderMicroservice.Services
 
         private void Configure()
         {
-            // hostname = 'localhost' for local debug, 'host.docker.internal' for docker
             var factory = new ConnectionFactory() { HostName = ConfigurationManager.AppSettings["RabbitHostName"] };
             factory.UserName = ConfigurationManager.AppSettings["RabbitUsername"];
             factory.Password = ConfigurationManager.AppSettings["RabbitPassword"];
@@ -46,8 +46,12 @@ namespace RabbitSenderMicroservice.Services
                             arguments: null
                         );
 
+                    var message = FormatMessage(args.MessageByteSize);
+                    var serializedMessage = JsonSerializer.SerializeToUtf8Bytes(message);
+
                     string guid = Guid.NewGuid().ToString();
-                    var body = Encoding.UTF8.GetBytes(guid);
+                    message.Guid = guid;
+                    var serializedMessageGuid = JsonSerializer.SerializeToUtf8Bytes(message);
 
                     for (int i = 0; i < args.MessageCount - 1; i++)
                     {
@@ -55,18 +59,19 @@ namespace RabbitSenderMicroservice.Services
                                 exchange: "",
                                 routingKey: args.Queue,
                                 basicProperties: null,
-                                body: null
+                                body: serializedMessage
                             );
                     }
 
+                    //last message goes with guid
                     channel.BasicPublish(
                                 exchange: "",
                                 routingKey: args.Queue,
                                 basicProperties: null,
-                                body: body
+                                body: serializedMessageGuid
                             );
 
-                    SendInitialTestResult(guid, DateTimeOffset.Now.ToUnixTimeMilliseconds());
+                    SendInitialTestResult(args, guid, DateTimeOffset.Now.ToUnixTimeMilliseconds());
                 }
 
                 return new ServiceResponse() { Success = true, Message = $"{args.MessageCount} messages sent" };
@@ -77,7 +82,7 @@ namespace RabbitSenderMicroservice.Services
             }
         }
 
-        private void SendInitialTestResult(string guid, long timestamp)
+        private void SendInitialTestResult(SendMessagesArgs args, string guid, long timestamp)
         {
             try
             {
@@ -87,7 +92,9 @@ namespace RabbitSenderMicroservice.Services
                 var sendData = new InitialTestData()
                 {
                     Guid = guid,
-                    SendAt = timestamp
+                    SendAt = timestamp,
+                    MessageCount = args.MessageCount,
+                    MessageSize = args.MessageByteSize
                 };
 
                 request.AddJsonBody(sendData);
@@ -96,8 +103,25 @@ namespace RabbitSenderMicroservice.Services
             }
             catch (Exception)
             {
-
             }
+        }
+
+        private RabbitMessage FormatMessage(int byteCount)
+        {
+            var data = "";
+            var bytes = Encoding.UTF8.GetBytes(data);
+
+            while (bytes.Length < byteCount)
+            {
+                data += "a";
+                bytes = Encoding.UTF8.GetBytes(data);
+            }
+
+            return new RabbitMessage
+            {
+                Data = data,
+                Guid = string.Empty
+            };
         }
     }
 }
