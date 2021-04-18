@@ -78,3 +78,5 @@ _[Ss]cripts
 /RabbitSenderMicroservice/Properties/app.config
 /RabbitConsumerMicroservice/RabbitConsumerMicroservice/Properties/app.config
 /ResultsMicroservice/Properties/app.config
+/KafkaConsumer/Properties/app.config
+/KafkaProducer/Properties/app.config
