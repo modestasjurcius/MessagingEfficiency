@@ -36,8 +36,6 @@ namespace ResultsMicroservice
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "ResultsMicroservice", Version = "v1" });
             });
 
-            services.AddTransient<MySqlDatabase>(_ => new MySqlDatabase(ConfigurationManager.AppSettings["connectionString"]));
-
             services.AddSingleton<IResultsRepository, ResultsRepository>();
             services.AddSingleton<IResultsService, ResultsService>();
         }
