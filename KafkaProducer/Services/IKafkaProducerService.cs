@@ -4,6 +4,6 @@ namespace KafkaProducer.Services
 {
     public interface IKafkaProducerService
     {
-        object SendToKafka(KafkaSendMessageArgs args);
+        ServiceResponse SendToKafka(KafkaSendMessageArgs args);
     }
 }

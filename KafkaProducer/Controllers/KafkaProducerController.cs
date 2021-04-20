@@ -24,10 +24,9 @@ namespace KafkaProducer.Controllers
 
         [HttpPost]
         [Route("[action]")]
-        public IActionResult SendMessage(KafkaSendMessageArgs args)
+        public ServiceResponse SendMessage(KafkaSendMessageArgs args)
         {
-            return Created(string.Empty, _service.SendToKafka(args));
-            //return _service.SendToKafka(args);
+            return _service.SendToKafka(args);
         }
     }
 }

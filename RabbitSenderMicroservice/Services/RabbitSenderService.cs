@@ -87,7 +87,7 @@ namespace RabbitSenderMicroservice.Services
             try
             {
                 var client = new RestClient(ConfigurationManager.AppSettings["ResultsUrl"]);
-                var request = new RestRequest("/Results/Insert", Method.POST);
+                var request = new RestRequest("/Results/InsertRabbit", Method.POST);
 
                 var sendData = new InitialTestData()
                 {

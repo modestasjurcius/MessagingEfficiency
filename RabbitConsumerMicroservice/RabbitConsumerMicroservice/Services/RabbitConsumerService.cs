@@ -60,7 +60,7 @@ namespace RabbitConsumerMicroservice.Services
             try
             {
                 var client = new RestClient(ConfigurationManager.AppSettings["ResultsUrl"]);
-                var request = new RestRequest("/Results/UpdateLastReceived", Method.POST);
+                var request = new RestRequest("/Results/UpdateRabbitLastReceived", Method.POST);
 
                 var sendData = new RabbitLastMessageReceivedArgs()
                 {

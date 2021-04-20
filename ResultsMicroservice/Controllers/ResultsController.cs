@@ -27,16 +27,30 @@ namespace ResultsMicroservice.Controllers
 
         [HttpPost]
         [Route("[action]")]
-        public ServiceResponse Insert(RabbitTestResult result)
+        public ServiceResponse InsertRabbit(TestResult result)
         {
             return _service.InsertRabbitResult(result);
         }
 
         [HttpPost]
         [Route("[action]")]
-        public ServiceResponse UpdateLastReceived(RabbitTestLastReceived args)
+        public ServiceResponse UpdateRabbitLastReceived(TestLastReceived args)
         {
             return _service.UpdateRabbitResult(args);
+        }
+
+        [HttpPost]
+        [Route("[action]")]
+        public ServiceResponse InsertKafka(TestResult result)
+        {
+            return _service.InsertKafkaResult(result);
+        }
+
+        [HttpPost]
+        [Route("[action]")]
+        public ServiceResponse UpdateKafkaLastReceived(TestLastReceived args)
+        {
+            return _service.UpdateKafkaResult(args);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿namespace ResultsMicroservice.Entities
 {
-    public class RabbitTestResult : RabbitTestLastReceived
+    public class TestResult : TestLastReceived
     {
         public long SendAt { get; set; }
         public int MessageCount { get; set; }
