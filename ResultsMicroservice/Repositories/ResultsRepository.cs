@@ -16,8 +16,12 @@ namespace ResultsMicroservice.Repositories
         {
             var cmd = _database.CreateCommand();
             cmd.CommandText = @"
-                    INSERT INTO rabbit_results (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize) 
-                    VALUES (?guid, FROM_UNIXTIME(?sendAt * 0.001), FROM_UNIXTIME(?lastReceivedAt * 0.001), ?count, ?size)";
+                    INSERT IGNORE INTO rabbit_results (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize) 
+                    VALUES (?guid, FROM_UNIXTIME(?sendAt * 0.001), FROM_UNIXTIME(?lastReceivedAt * 0.001), ?count, ?size)
+                    ON DUPLICATE KEY UPDATE
+                    SendAt = FROM_UNIXTIME(?sendAt * 0.001),
+                    MessageCount = ?count,
+                    MessageByteSize = ?size;";
 
             cmd.Parameters.AddWithValue("?guid", result.Guid);
             cmd.Parameters.AddWithValue("?sendAt", result.SendAt);
@@ -32,11 +36,12 @@ namespace ResultsMicroservice.Repositories
         {
             var cmd = _database.CreateCommand();
             cmd.CommandText = @"
-                    UPDATE rabbit_results 
-                    SET LastReceivedAt = FROM_UNIXTIME(?receivedAt * 0.001) 
-                    WHERE Guid = ?guid";
+                    INSERT IGNORE INTO rabbit_results (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize) 
+                    VALUES (?guid, null, FROM_UNIXTIME(?lastReceivedAt * 0.001), null, null)
+                    ON DUPLICATE KEY UPDATE
+                    LastReceivedAt = FROM_UNIXTIME(?lastReceivedAt * 0.001);";
 
-            cmd.Parameters.AddWithValue("?receivedAt", args.LastReceivedAt);
+            cmd.Parameters.AddWithValue("?lastReceivedAt", args.LastReceivedAt);
             cmd.Parameters.AddWithValue("?guid", args.Guid);
 
             cmd.ExecuteNonQuery();
@@ -46,8 +51,12 @@ namespace ResultsMicroservice.Repositories
         {
             var cmd = _database.CreateCommand();
             cmd.CommandText = @"
-                    INSERT INTO kafka_results (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize) 
-                    VALUES (?guid, FROM_UNIXTIME(?sendAt * 0.001), FROM_UNIXTIME(?lastReceivedAt * 0.001), ?count, ?size)";
+                    INSERT IGNORE INTO kafka_results (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize) 
+                    VALUES (?guid, FROM_UNIXTIME(?sendAt * 0.001), FROM_UNIXTIME(?lastReceivedAt * 0.001), ?count, ?size)
+                    ON DUPLICATE KEY UPDATE
+                    SendAt = FROM_UNIXTIME(?sendAt * 0.001),
+                    MessageCount = ?count,
+                    MessageByteSize = ?size;";
 
             cmd.Parameters.AddWithValue("?guid", result.Guid);
             cmd.Parameters.AddWithValue("?sendAt", result.SendAt);
@@ -62,11 +71,12 @@ namespace ResultsMicroservice.Repositories
         {
             var cmd = _database.CreateCommand();
             cmd.CommandText = @"
-                    UPDATE kafka_results 
-                    SET LastReceivedAt = FROM_UNIXTIME(?receivedAt * 0.001) 
-                    WHERE Guid = ?guid";
+                    INSERT IGNORE INTO kafka_results (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize) 
+                    VALUES (?guid, null, FROM_UNIXTIME(?lastReceivedAt * 0.001), null, null)
+                    ON DUPLICATE KEY UPDATE
+                    LastReceivedAt = FROM_UNIXTIME(?lastReceivedAt * 0.001);";
 
-            cmd.Parameters.AddWithValue("?receivedAt", args.LastReceivedAt);
+            cmd.Parameters.AddWithValue("?lastReceivedAt", args.LastReceivedAt);
             cmd.Parameters.AddWithValue("?guid", args.Guid);
 
             cmd.ExecuteNonQuery();

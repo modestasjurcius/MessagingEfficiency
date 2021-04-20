@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using ResultsMicroservice.Entities;
 using ResultsMicroservice.Services;
 
@@ -9,12 +8,10 @@ namespace ResultsMicroservice.Controllers
     [Route("[controller]")]
     public class ResultsController : ControllerBase
     {
-        private readonly ILogger<ResultsController> _logger;
         private readonly IResultsService _service;
 
-        public ResultsController(ILogger<ResultsController> logger, IResultsService service)
+        public ResultsController(IResultsService service)
         {
-            _logger = logger;
             _service = service;
         }
 

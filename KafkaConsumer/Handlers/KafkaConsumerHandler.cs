@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using KafkaConsumer.Entities;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using RestSharp;
 using System;
 using System.Collections.Generic;
@@ -14,7 +15,14 @@ namespace KafkaConsumer.Handlers
 {
     public class KafkaConsumerHandler : IHostedService
     {
+        private readonly ILogger<KafkaConsumerHandler> _logger;
         private readonly string topic = "mytopic";
+
+        public KafkaConsumerHandler(ILogger<KafkaConsumerHandler> logger)
+        {
+            _logger = logger;
+        }
+
         public Task StartAsync(CancellationToken cancellationToken)
         {
             var config = new ConsumerConfig
@@ -39,13 +47,17 @@ namespace KafkaConsumer.Handlers
                             var readOnlySpan = new ReadOnlySpan<byte>(consumer.Message.Value);
                             var message = JsonSerializer.Deserialize<KafkaMessage>(readOnlySpan);
 
-                            if (!string.IsNullOrWhiteSpace(message.Guid))
+                            if (message != null && !string.IsNullOrWhiteSpace(message.Guid))
+                            {
+                                _logger.LogInformation($"KafkaConsumerHandler.Consume: Message guid: {message.Guid}");
                                 UpdateLastReceived(message.Guid, DateTimeOffset.Now.ToUnixTimeMilliseconds());
+                            }
                         }
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    _logger.LogError($"StartAsync: {ex.Message}");
                     builder.Close();
                 }
             }
@@ -69,10 +81,11 @@ namespace KafkaConsumer.Handlers
                 request.AddJsonBody(sendData);
 
                 var response = client.Execute<ServiceResponse>(request);
-
+                _logger.LogInformation($"UpdateLastReceived: response status: {response.StatusCode} , error: {response.ErrorMessage}");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError($"UpdateLastReceived: {ex.Message}");
             }
         }
 

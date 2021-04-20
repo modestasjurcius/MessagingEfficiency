@@ -8,11 +8,8 @@ namespace KafkaConsumer.Controllers
     [Route("[controller]")]
     public class KafkaConsumerController : ControllerBase
     {
-        private readonly ILogger<KafkaConsumerController> _logger;
-
-        public KafkaConsumerController(ILogger<KafkaConsumerController> logger)
+        public KafkaConsumerController()
         {
-            _logger = logger;
         }
 
         [HttpGet]

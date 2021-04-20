@@ -35,7 +35,9 @@ namespace KafkaProducer.Services
             {
                 try
                 {
-                    SendMessages(producer, args.MessageCount, serializedMessage, serializedMessageGuid);
+                    var lastTimestamp = SendMessages(producer, args.MessageCount, serializedMessage, serializedMessageGuid);
+                    SendInitialTestResult(args, guid, lastTimestamp);
+
                 }
                 catch (Exception ex)
                 {
@@ -59,7 +61,7 @@ namespace KafkaProducer.Services
             };
         }
 
-        private void SendMessages(IProducer<Null, byte[]> producer, int count, byte[] data, byte[] dataGuid)
+        private long SendMessages(IProducer<Null, byte[]> producer, int count, byte[] data, byte[] dataGuid)
         {
             for(int i = 0; i < count - 1; i++)
             {
@@ -71,6 +73,8 @@ namespace KafkaProducer.Services
             producer.ProduceAsync(_topic, new Message<Null, byte[]> { Value = dataGuid })
                         .GetAwaiter()
                         .GetResult();
+
+            return DateTimeOffset.Now.ToUnixTimeMilliseconds();
         }
 
         private void SendInitialTestResult(KafkaSendMessageArgs args, string guid, long timestamp)
