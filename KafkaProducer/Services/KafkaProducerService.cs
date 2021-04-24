@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using KafkaProducer.Entities;
+using Microsoft.Extensions.Logging;
 using RestSharp;
 using System;
 using System.Configuration;
@@ -11,12 +12,16 @@ namespace KafkaProducer.Services
     {
         private readonly ProducerConfig _config;
         private readonly string _topic;
+        private readonly ILogger<KafkaProducerService> _logger;
 
-        public KafkaProducerService()
+        public KafkaProducerService(ILogger<KafkaProducerService> logger)
         {
+            _logger = logger;
+
             _config = new ProducerConfig()
             {
-                BootstrapServers = ConfigurationManager.AppSettings["BootstrapServers"]
+                BootstrapServers = ConfigurationManager.AppSettings["BootstrapServers"],
+                TransactionalId = ConfigurationManager.AppSettings["KafkaTransactionalId"]
             };
 
             _topic = ConfigurationManager.AppSettings["KafkaTopic"];
@@ -35,13 +40,12 @@ namespace KafkaProducer.Services
             {
                 try
                 {
-                    var lastTimestamp = SendMessages(producer, args.MessageCount, serializedMessage, serializedMessageGuid);
-                    SendInitialTestResult(args, guid, lastTimestamp);
+                    SendMessages(producer, args.MessageCount, serializedMessage, serializedMessageGuid, args, guid);
 
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Kafka producer error: {ex.Message}");
+                    _logger.LogError($"Kafka producer error: {ex.Message}");
                     return new ServiceResponse() { Success = false, Message = ex.Message };
                 }
             }
@@ -61,20 +65,21 @@ namespace KafkaProducer.Services
             };
         }
 
-        private long SendMessages(IProducer<Null, byte[]> producer, int count, byte[] data, byte[] dataGuid)
+        private void SendMessages(IProducer<Null, byte[]> producer, int count, byte[] data, byte[] dataGuid, KafkaSendMessageArgs args, string guid)
         {
+            producer.InitTransactions(TimeSpan.FromSeconds(10));
+            producer.BeginTransaction();
+
             for(int i = 0; i < count - 1; i++)
             {
-                producer.ProduceAsync(_topic, new Message<Null, byte[]> { Value = data })
-                        .GetAwaiter()
-                        .GetResult();
+                producer.Produce(_topic, new Message<Null, byte[]> { Value = data });
             }
 
-            producer.ProduceAsync(_topic, new Message<Null, byte[]> { Value = dataGuid })
-                        .GetAwaiter()
-                        .GetResult();
+            producer.Produce(_topic, new Message<Null, byte[]> { Value = dataGuid });
 
-            return DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            producer.CommitTransaction();
+
+            SendInitialTestResult(args, guid, DateTimeOffset.Now.ToUnixTimeMilliseconds());
         }
 
         private void SendInitialTestResult(KafkaSendMessageArgs args, string guid, long timestamp)
@@ -96,8 +101,9 @@ namespace KafkaProducer.Services
 
                 var response = client.Execute<ServiceResponse>(request);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError($"KafkaProducer.SendInitialTestResult error: {ex.Message}");
             }
         }
     }
