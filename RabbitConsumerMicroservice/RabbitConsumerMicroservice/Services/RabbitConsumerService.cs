@@ -1,10 +1,10 @@
-﻿using RabbitConsumerMicroservice.Entities;
+﻿using Microsoft.Extensions.Logging;
+using RabbitConsumerMicroservice.Entities;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RestSharp;
 using System;
 using System.Configuration;
-using System.Text;
 using System.Text.Json;
 
 namespace RabbitConsumerMicroservice.Services
@@ -13,8 +13,10 @@ namespace RabbitConsumerMicroservice.Services
     {
         private IConnection _connection;
         private IModel _channel;
-        public RabbitConsumerService()
+        private readonly ILogger<RabbitConsumerService> _logger;
+        public RabbitConsumerService(ILogger<RabbitConsumerService> logger)
         {
+            _logger = logger;
             ConfigureConsumer();
         }
         
@@ -30,15 +32,7 @@ namespace RabbitConsumerMicroservice.Services
                 var consumer = new EventingBasicConsumer(_channel);
                 consumer.Received += (model, ea) =>
                 {
-                    var body = ea.Body.ToArray();
-                    if (body.Length == 0)
-                        return;
-
-                    var readOnlySpan = new ReadOnlySpan<byte>(body);
-                    var message = JsonSerializer.Deserialize<RabbitMessage>(readOnlySpan);
-
-                    if (message != null && !string.IsNullOrWhiteSpace(message.Guid))
-                        UpdateLastReceived(DateTimeOffset.Now.ToUnixTimeMilliseconds(), message.Guid);
+                    HandleMessage(ea);
                 };
 
                 _channel.BasicConsume(
@@ -51,7 +45,40 @@ namespace RabbitConsumerMicroservice.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Consume: {ex.Message}");
                 return new ServiceResponse() { Success = false, Message = ex.Message };
+            }
+        }
+
+        private void HandleMessage(BasicDeliverEventArgs args)
+        {
+            try
+            {
+                var body = args.Body.ToArray();
+                if (body.Length == 0)
+                    return;
+
+                var readOnlySpan = new ReadOnlySpan<byte>(body);
+                var message = JsonSerializer.Deserialize<RabbitMessage>(readOnlySpan);
+
+                if (message == null)
+                {
+                    return;
+                }
+                else if (message.Data == "first")
+                {
+                    _logger.LogInformation($"First message received at: {DateTimeOffset.Now.AddHours(3).ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+                }
+                else if (!string.IsNullOrWhiteSpace(message.Guid))
+                {
+                    var now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                    _logger.LogInformation($"Last message, guid: {message.Guid}, received at: {DateTimeOffset.FromUnixTimeMilliseconds(now).AddHours(3).ToString("yyyy-MM-dd HH:mm:ss.fff")}"); // +0300
+                    UpdateLastReceived(now, message.Guid);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"HandleMessage: {ex.Message}");
             }
         }
 
@@ -97,8 +124,9 @@ namespace RabbitConsumerMicroservice.Services
                             arguments: null
                         );
             }
-            catch(Exception)
+            catch(Exception ex)
             {
+                _logger.LogError($"ConfigureConsumer: {ex.Message}");
             }
         }
     }

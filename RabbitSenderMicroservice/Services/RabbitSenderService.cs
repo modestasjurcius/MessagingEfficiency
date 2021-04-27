@@ -1,4 +1,5 @@
-﻿using RabbitMQ.Client;
+﻿using Microsoft.Extensions.Logging;
+using RabbitMQ.Client;
 using RabbitSenderMicroservice.Entities;
 using RestSharp;
 using System;
@@ -11,9 +12,11 @@ namespace RabbitSenderMicroservice.Services
     public class RabbitSenderService : IRabbitSenderService
     {
         private IConnection _connection;
+        private readonly ILogger<RabbitSenderService> _logger;
 
-        public RabbitSenderService()
+        public RabbitSenderService(ILogger<RabbitSenderService> logger)
         {
+            _logger = logger;
             Configure();
         }
 
@@ -38,22 +41,63 @@ namespace RabbitSenderMicroservice.Services
             {
                 using (var channel = _connection.CreateModel())
                 {
-                    channel.QueueDeclare(
-                            queue: args.Queue,
-                            durable: args.Durable,
-                            exclusive: args.Exclusive,
-                            autoDelete: args.AutoDelete,
-                            arguments: null
+                    SendMessages(channel, args);
+                }
+
+                return new ServiceResponse() { Success = true, Message = $"{args.MessageCount} messages, of size {args.MessageByteSize} bytes, sent to queue {args.Queue}" };
+            }
+            catch (Exception ex)
+            {
+                return new ServiceResponse() { Success = false, Message = ex.Message };
+            }
+        }
+
+        private void SendMessages(IModel channel, SendMessagesArgs args)
+        {
+            try
+            {
+                channel.QueueDeclare(
+                                queue: args.Queue,
+                                durable: args.Durable,
+                                exclusive: args.Exclusive,
+                                autoDelete: args.AutoDelete,
+                                arguments: null
+                            );
+
+                int loopCount = args.MessageCount;
+
+                byte[] firstMessageData = null;
+                if (args.FlagFirstMessage)
+                {
+                    var firstMessage = GetFirstMessage();
+                    firstMessageData = JsonSerializer.SerializeToUtf8Bytes(firstMessage);
+                    loopCount -= 2;
+                }
+                else
+                {
+                    loopCount -= 1;
+                }
+
+                var message = FormatMessage(args.MessageByteSize);
+                var serializedMessage = JsonSerializer.SerializeToUtf8Bytes(message);
+
+                string guid = Guid.NewGuid().ToString();
+                message.Guid = guid;
+                var serializedMessageGuid = JsonSerializer.SerializeToUtf8Bytes(message);
+
+                if (firstMessageData != null)
+                {
+                    channel.BasicPublish(
+                            exchange: "",
+                            routingKey: args.Queue,
+                            basicProperties: null,
+                            body: firstMessageData
                         );
+                }
 
-                    var message = FormatMessage(args.MessageByteSize);
-                    var serializedMessage = JsonSerializer.SerializeToUtf8Bytes(message);
-
-                    string guid = Guid.NewGuid().ToString();
-                    message.Guid = guid;
-                    var serializedMessageGuid = JsonSerializer.SerializeToUtf8Bytes(message);
-
-                    for (int i = 0; i < args.MessageCount - 1; i++)
+                if (loopCount > 0)
+                {
+                    for (int i = 0; i < loopCount; i++)
                     {
                         channel.BasicPublish(
                                 exchange: "",
@@ -62,23 +106,23 @@ namespace RabbitSenderMicroservice.Services
                                 body: serializedMessage
                             );
                     }
-
-                    //last message goes with guid
-                    channel.BasicPublish(
-                                exchange: "",
-                                routingKey: args.Queue,
-                                basicProperties: null,
-                                body: serializedMessageGuid
-                            );
-
-                    SendInitialTestResult(args, guid, DateTimeOffset.Now.ToUnixTimeMilliseconds());
                 }
 
-                return new ServiceResponse() { Success = true, Message = $"{args.MessageCount} messages sent" };
+                //last message goes with guid
+                channel.BasicPublish(
+                            exchange: "",
+                            routingKey: args.Queue,
+                            basicProperties: null,
+                            body: serializedMessageGuid
+                        );
+
+                var now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                _logger.LogInformation($"Rabbit sender: Guid = {guid} - Sent at: {DateTimeOffset.FromUnixTimeMilliseconds(now).AddHours(3).ToString("yyyy-MM-dd HH:mm:ss.fff")}"); //cuz im in +0300 atm
+                SendInitialTestResult(args, guid, now);
             }
             catch (Exception ex)
             {
-                return new ServiceResponse() { Success = false, Message = ex.Message };
+                _logger.LogError($"SendMessages: {ex.Message}");
             }
         }
 
@@ -94,7 +138,8 @@ namespace RabbitSenderMicroservice.Services
                     Guid = guid,
                     SendAt = timestamp,
                     MessageCount = args.MessageCount,
-                    MessageSize = args.MessageByteSize
+                    MessageSize = args.MessageByteSize,
+                    Topic = args.Queue,
                 };
 
                 request.AddJsonBody(sendData);
@@ -120,6 +165,15 @@ namespace RabbitSenderMicroservice.Services
             return new RabbitMessage
             {
                 Data = data,
+                Guid = string.Empty
+            };
+        }
+
+        private RabbitMessage GetFirstMessage()
+        {
+            return new RabbitMessage()
+            {
+                Data = "first",
                 Guid = string.Empty
             };
         }

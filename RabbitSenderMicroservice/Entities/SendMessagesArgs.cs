@@ -8,5 +8,6 @@
         public bool AutoDelete { get; set; }
         public int MessageCount { get; set; }
         public int MessageByteSize { get; set; }
+        public bool FlagFirstMessage { get; set; }
     }
 }

@@ -21,18 +21,20 @@ namespace ResultsMicroservice.Repositories
                 conn.Open();
                 var cmd = conn.CreateCommand();
                 cmd.CommandText = @"
-                    INSERT IGNORE INTO rabbit_results (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize) 
-                    VALUES (?guid, FROM_UNIXTIME(?sendAt * 0.001), FROM_UNIXTIME(?lastReceivedAt * 0.001), ?count, ?size)
+                    INSERT IGNORE INTO rabbit_results_v2 (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize, Queue) 
+                    VALUES (?guid, FROM_UNIXTIME(?sendAt * 0.001), FROM_UNIXTIME(?lastReceivedAt * 0.001), ?count, ?size, ?queue)
                     ON DUPLICATE KEY UPDATE
                     SendAt = FROM_UNIXTIME(?sendAt * 0.001),
                     MessageCount = ?count,
-                    MessageByteSize = ?size;";
+                    MessageByteSize = ?size,
+                    Queue = ?queue;";
 
                 cmd.Parameters.AddWithValue("?guid", result.Guid);
                 cmd.Parameters.AddWithValue("?sendAt", result.SendAt);
                 cmd.Parameters.AddWithValue("?lastReceivedAt", result.LastReceivedAt);
                 cmd.Parameters.AddWithValue("?count", result.MessageCount);
                 cmd.Parameters.AddWithValue("?size", result.MessageSize);
+                cmd.Parameters.AddWithValue("?queue", result.Topic);
 
                 cmd.ExecuteNonQuery();
             }
@@ -45,8 +47,8 @@ namespace ResultsMicroservice.Repositories
                 conn.Open();
                 var cmd = conn.CreateCommand();
                 cmd.CommandText = @"
-                    INSERT IGNORE INTO rabbit_results (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize) 
-                    VALUES (?guid, null, FROM_UNIXTIME(?lastReceivedAt * 0.001), null, null)
+                    INSERT IGNORE INTO rabbit_results_v2 (Guid, SendAt, LastReceivedAt, MessageCount, MessageByteSize, Queue) 
+                    VALUES (?guid, null, FROM_UNIXTIME(?lastReceivedAt * 0.001), null, null, null)
                     ON DUPLICATE KEY UPDATE
                     LastReceivedAt = FROM_UNIXTIME(?lastReceivedAt * 0.001);";
 
