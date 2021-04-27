@@ -11,7 +11,6 @@ namespace KafkaProducer.Services
     public class KafkaProducerService : IKafkaProducerService
     {
         private readonly ProducerConfig _config;
-        private readonly string _topic;
         private readonly ILogger<KafkaProducerService> _logger;
 
         public KafkaProducerService(ILogger<KafkaProducerService> logger)
@@ -23,8 +22,6 @@ namespace KafkaProducer.Services
                 BootstrapServers = ConfigurationManager.AppSettings["BootstrapServers"],
                 TransactionalId = ConfigurationManager.AppSettings["KafkaTransactionalId"]
             };
-
-            _topic = ConfigurationManager.AppSettings["KafkaTopic"];
         }
 
         public ServiceResponse SendToKafka(KafkaSendMessageArgs args)
@@ -40,7 +37,7 @@ namespace KafkaProducer.Services
             {
                 try
                 {
-                    SendMessages(producer, args.MessageCount, serializedMessage, serializedMessageGuid, args, guid);
+                    SendMessages(producer, args, serializedMessage, serializedMessageGuid, guid);
 
                 }
                 catch (Exception ex)
@@ -65,21 +62,23 @@ namespace KafkaProducer.Services
             };
         }
 
-        private void SendMessages(IProducer<Null, byte[]> producer, int count, byte[] data, byte[] dataGuid, KafkaSendMessageArgs args, string guid)
+        private void SendMessages(IProducer<Null, byte[]> producer, KafkaSendMessageArgs args, byte[] data, byte[] dataGuid, string guid)
         {
             producer.InitTransactions(TimeSpan.FromSeconds(10));
             producer.BeginTransaction();
 
-            for(int i = 0; i < count - 1; i++)
+            for(int i = 0; i < args.MessageCount - 1; i++)
             {
-                producer.Produce(_topic, new Message<Null, byte[]> { Value = data });
+                producer.Produce(args.Topic, new Message<Null, byte[]> { Value = data });
             }
 
-            producer.Produce(_topic, new Message<Null, byte[]> { Value = dataGuid });
+            producer.Produce(args.Topic, new Message<Null, byte[]> { Value = dataGuid });
 
             producer.CommitTransaction();
 
-            SendInitialTestResult(args, guid, DateTimeOffset.Now.ToUnixTimeMilliseconds());
+            var now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            SendInitialTestResult(args, guid, now);
+            _logger.LogInformation($"Kafka sender: Guid = {guid} - Sent at: {DateTimeOffset.FromUnixTimeMilliseconds(now).AddHours(3).ToString("yyyy-MM-dd hh:mm:ss.fff tt")}"); //cuz im in +0300 atm
         }
 
         private void SendInitialTestResult(KafkaSendMessageArgs args, string guid, long timestamp)
@@ -94,7 +93,8 @@ namespace KafkaProducer.Services
                     Guid = guid,
                     SendAt = timestamp,
                     MessageCount = args.MessageCount,
-                    MessageSize = args.MessageByteSize
+                    MessageSize = args.MessageByteSize,
+                    Topic = args.Topic,
                 };
 
                 request.AddJsonBody(sendData);

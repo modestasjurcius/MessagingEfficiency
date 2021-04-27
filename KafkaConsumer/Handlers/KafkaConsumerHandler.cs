@@ -16,7 +16,6 @@ namespace KafkaConsumer.Handlers
     public class KafkaConsumerHandler : IHostedService
     {
         private readonly ILogger<KafkaConsumerHandler> _logger;
-        private readonly string topic = "mytopic";
 
         public KafkaConsumerHandler(ILogger<KafkaConsumerHandler> logger)
         {
@@ -28,14 +27,16 @@ namespace KafkaConsumer.Handlers
             var config = new ConsumerConfig
             {
                 GroupId = ConfigurationManager.AppSettings["KafkaConsumerGroup"],
-                BootstrapServers = ConfigurationManager.AppSettings["BootstrapServers"], //"localhost:9092", // host.docker.internal
+                BootstrapServers = ConfigurationManager.AppSettings["BootstrapServers"],
                 AutoOffsetReset = AutoOffsetReset.Earliest
             };
 
             using (var builder = new ConsumerBuilder<Ignore, byte[]>(config).Build())
             {
-                builder.Subscribe(topic);
+                builder.Subscribe(ConfigurationManager.AppSettings["KafkaTopic"]);
                 var cancelToken = new CancellationTokenSource();
+
+                bool first = true;
 
                 try
                 {
@@ -47,10 +48,18 @@ namespace KafkaConsumer.Handlers
                             var readOnlySpan = new ReadOnlySpan<byte>(consumer.Message.Value);
                             var message = JsonSerializer.Deserialize<KafkaMessage>(readOnlySpan);
 
+                            if (first)
+                            {
+                                _logger.LogInformation($"First message, offset = {consumer.Offset} received at: {DateTimeOffset.Now.ToString("yyyy-MM-dd hh:mm:ss.fff tt")}");
+                                first = false;
+                            }
+
                             if (message != null && !string.IsNullOrWhiteSpace(message.Guid))
                             {
-                                _logger.LogInformation($"KafkaConsumerHandler.Consume: Message guid: {message.Guid}");
+                                var now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
                                 UpdateLastReceived(message.Guid, DateTimeOffset.Now.ToUnixTimeMilliseconds());
+                                _logger.LogInformation($"Last message, offset = {consumer.Offset}, guid: {message.Guid}, received at: {DateTimeOffset.FromUnixTimeMilliseconds(now).ToString("yyyy-MM-dd hh:mm:ss.fff tt")}"); // +0300
+                                first = true;
                             }
                         }
                     }
